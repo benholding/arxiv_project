@@ -43,9 +43,10 @@ arxiv_doi_df['arxiv_id'] = arxiv_doi_df['arxiv_id'].str.lower()
 arxiv_doi_df['doi'] = arxiv_doi_df['doi'].str.lower()
 arxiv_doi_df['preprint_days'] = arxiv_doi_df['preprint_days'].astype(int)
 
-arxiv_doi_df_reduced = arxiv_doi_df[(arxiv_doi_df['preprint_days'] >= 365)] #keeping only preprints that were preprints for a year before being published
+arxiv_doi_df_reduced = arxiv_doi_df[(arxiv_doi_df['preprint_days'] >= 365) & (arxiv_doi_df['publication_date'] <= '2016-12-31')] #keeping only preprints that were preprints for a year before being published and articles that had 1 year to collect citations
 plt.hist(arxiv_doi_df_reduced.pre_publication_n_cit,100)
 plt.hist(arxiv_doi_df_reduced.post_publication_n_cit, 100)
+
 
 #%%
 # combining the two dataframes
@@ -63,17 +64,31 @@ merged_two_datasets[['date', 'preprint_date', 'publication_date']] = merged_two_
 
 merged_two_datasets['days_from_publication'] = (merged_two_datasets.date - merged_two_datasets.publication_date).dt.days
         
-merged_two_datasets_reduced = merged_two_datasets[(merged_two_datasets['days_from_publication'] <= 365)]
+preprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_preprint_posted'] <= 365)]
+postprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_publication'] >= 0) & (merged_two_datasets['days_from_publication'] <= 365)]
 
+preprint_citations_year1_totalcounts = preprint_citations_year1\
+    .groupby('arxiv_id')\
+    .agg({'doi': 'first', 'cit': 'sum', 'preprint_date': 'first', 'publication_date': 'first'})\
+    .sort_values('cit', ascending = False)\
+    .rename(columns = {'cit': 'preprint_citations_1styear'})
+    
+postprint_citations_year1_totalcounts = postprint_citations_year1\
+     .groupby('arxiv_id')\
+     .agg({'doi': 'first', 'cit': 'sum', 'preprint_date': 'first', 'publication_date': 'first'})\
+     .sort_values('cit', ascending = False)\
+     .rename(columns = {'cit': 'postprint_citations_1styear'})
+
+cumulative_dataset = postprint_citations_year1_totalcounts\
+    .merge(preprint_citations_year1_totalcounts, on = ['arxiv_id', 'doi', 'preprint_date', 'publication_date'], how = 'outer' )
 
 # i need to now include preprints who didn't get any citations in the window AND articles that didn't get any citations in the window
-citations_by_day['date'].max()
+articles_with_zero_cites = arxiv_doi_df_reduced[(arxiv_doi_df_reduced['pre_publication_n_cit'] == 0) & (arxiv_doi_df_reduced['post_publication_n_cit'] == 0)]
 
-cit_day = days since preprint published
-
-citation_dynamics_df.loc['0704.0001']
-citations_new = citation_dynamics_df.reset_index().merge(arxiv_doi_df.reset_index()[['arxiv_id','preprint_days']],on=['arxiv_id'], how ='left').set_index('arxiv_id')
-citations_new['days_before_publishing'] = citations_new.cit_day-citations_new.preprint_days
-citations_preprints = citations_new[citations_new['days_before_publishing'] < 0]
-
-citations_preprints_n = citations_preprints.reset_index().drop_duplicates('arxiv_id').groupby('arxiv_id').agg({'doi': 'first', 'cit': 'sum', 'preprint_days': 'first', 'days_before_publishing': 'first'}).sort_values('cit', ascending = False)
+#%% old code
+#cit_day = days since preprint published
+#citation_dynamics_df.loc['0704.0001']
+#citations_new = citation_dynamics_df.reset_index().merge(arxiv_doi_df.reset_index()[['arxiv_id','preprint_days']],on=['arxiv_id'], how ='left').set_index('arxiv_id')
+#citations_new['days_before_publishing'] = citations_new.cit_day-citations_new.preprint_days
+#citations_preprints = citations_new[citations_new['days_before_publishing'] < 0]
+#citations_preprints_n = citations_preprints.reset_index().drop_duplicates('arxiv_id').groupby('arxiv_id').agg({'doi': 'first', 'cit': 'sum', 'preprint_days': 'first', 'days_before_publishing': 'first'}).sort_values('cit', ascending = False)
