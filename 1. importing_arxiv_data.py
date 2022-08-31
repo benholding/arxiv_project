@@ -80,10 +80,29 @@ postprint_citations_year1_totalcounts = postprint_citations_year1\
      .rename(columns = {'cit': 'postprint_citations_1styear'})
 
 cumulative_dataset = postprint_citations_year1_totalcounts\
-    .merge(preprint_citations_year1_totalcounts, on = ['arxiv_id', 'doi', 'preprint_date', 'publication_date'], how = 'outer' )
+    .merge(preprint_citations_year1_totalcounts, on = ['arxiv_id', 'doi', 'preprint_date', 'publication_date'], how = 'outer' )\
+    .reset_index()\
+    .fillna(0)
 
-# i need to now include preprints who didn't get any citations in the window AND articles that didn't get any citations in the window
-articles_with_zero_cites = arxiv_doi_df_reduced[(arxiv_doi_df_reduced['pre_publication_n_cit'] == 0) & (arxiv_doi_df_reduced['post_publication_n_cit'] == 0)]
+
+#i need to make two dataframes - a) one with articles with recieved citations, but not in the 1 year window, and b) one of the articles (combined preprint and postprint) that never recieved any citations
+#a)
+arxiv_ids_no_citesfirstyear = pd.DataFrame(citations_by_day_reduced.arxiv_id[~citations_by_day_reduced.arxiv_id.isin(cumulative_dataset.arxiv_id)]).drop_duplicates()
+no_cites_first_year = arxiv_ids_no_citesfirstyear.merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')\
+    .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0)\
+    .filter(items = cumulative_dataset.columns)
+    
+cumulative_dataset_with_nocitesfirstyear = pd.concat([cumulative_dataset, no_cites_first_year])
+#b)
+#which of the arxiv_ids were in preprint_info but not in cumulative_dataset_with_nocitesfirstyear
+
+arxiv_ids_no_cites_ever = pd.DataFrame(preprint_info.arxiv_id[~preprint_info.arxiv_id.isin(cumulative_dataset_with_nocitesfirstyear.arxiv_id)])
+no_cites_ever = arxiv_ids_no_cites_ever.merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')\
+    .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0)\
+    .filter(items = cumulative_dataset.columns)
+    
+article_citations_complete = pd.concat([cumulative_dataset_with_nocitesfirstyear, no_cites_ever]).sort_values('preprint_citations_1styear', ascending = False)\
+    .set_index('arxiv_id')
 
 #%% old code
 #cit_day = days since preprint published
