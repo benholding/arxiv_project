@@ -104,10 +104,5 @@ no_cites_ever = arxiv_ids_no_cites_ever.merge(arxiv_doi_df_reduced, on = 'arxiv_
 article_citations_complete = pd.concat([cumulative_dataset_with_nocitesfirstyear, no_cites_ever]).sort_values('preprint_citations_1styear', ascending = False)\
     .set_index('arxiv_id')
 
-#%% old code
-#cit_day = days since preprint published
-#citation_dynamics_df.loc['0704.0001']
-#citations_new = citation_dynamics_df.reset_index().merge(arxiv_doi_df.reset_index()[['arxiv_id','preprint_days']],on=['arxiv_id'], how ='left').set_index('arxiv_id')
-#citations_new['days_before_publishing'] = citations_new.cit_day-citations_new.preprint_days
-#citations_preprints = citations_new[citations_new['days_before_publishing'] < 0]
-#citations_preprints_n = citations_preprints.reset_index().drop_duplicates('arxiv_id').groupby('arxiv_id').agg({'doi': 'first', 'cit': 'sum', 'preprint_days': 'first', 'days_before_publishing': 'first'}).sort_values('cit', ascending = False)
+#%% # saving final dataset
+article_citations_complete.to_pickle("data/cumulative_citatations_data.pkl")
