@@ -7,15 +7,25 @@ Created on Wed Aug 31 14:10:08 2022
 """
 import urllib.request
 import urllib
+import pandas as pd
+pd.set_option('display.max_columns', 6)
 
 # getting author names, and institutions from arxiv_id and doi
 
-#%% #get cumulative citations data
-
+#%% #get arxiv_ids
 
 article_citations_complete = pd.read_pickle(
     "data/cumulative_citatations_data.pkl")
 
-url = 'http://export.arxiv.org/api/query?search_query=all:electron&start=0&max_results=1'
- data = urllib.request.urlopen(url)
-   print(data.read().decode('utf-8'))
+arxiv_id_df = article_citations_complete.index.to_numpy()
+
+#%% 
+arxiv_api_data = []
+url = 'http://export.arxiv.org/api/query?id_list=cond-mat/0207270v1'
+data = urllib.request.urlopen(url)
+print(data.read().decode('utf-8'))
+
+
+for i in len(arxiv_id_df)-1:
+    temp_df = urllib.request.urlopen("http://export.arxiv.org/api/query?id_list="+arxiv_id_df[i])
+    dataframes_list.append(data.read().decode('utf-8')))
