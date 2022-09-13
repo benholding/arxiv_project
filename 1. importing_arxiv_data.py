@@ -102,7 +102,8 @@ no_cites_ever = arxiv_ids_no_cites_ever.merge(arxiv_doi_df_reduced, on = 'arxiv_
     .filter(items = cumulative_dataset.columns)
     
 article_citations_complete = pd.concat([cumulative_dataset_with_nocitesfirstyear, no_cites_ever]).sort_values('preprint_citations_1styear', ascending = False)\
-    .set_index('arxiv_id')
+    .set_index('arxiv_id')\
+    .sort_values(['postprint_citations_1styear','preprint_citations_1styear', 'arxiv_id'], ascending = False)
 
 #%% # saving final dataset
 article_citations_complete.to_pickle("data/cumulative_citatations_data.pkl")
