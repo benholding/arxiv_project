@@ -43,6 +43,8 @@ arxiv_doi_df['arxiv_id'] = arxiv_doi_df['arxiv_id'].str.lower()
 arxiv_doi_df['doi'] = arxiv_doi_df['doi'].str.lower()
 arxiv_doi_df['preprint_days'] = arxiv_doi_df['preprint_days'].astype(int)
 
+arxiv_doi_df.doi.drop_duplicates().to_csv("arxiv_published_dois.csv", index=False)
+
 arxiv_doi_df_reduced = arxiv_doi_df[(arxiv_doi_df['preprint_days'] >= 365) & (arxiv_doi_df['publication_date'] <= '2016-12-31')] #keeping only preprints that were preprints for a year before being published and articles that had 1 year to collect citations
 plt.hist(arxiv_doi_df_reduced.pre_publication_n_cit,100)
 plt.hist(arxiv_doi_df_reduced.post_publication_n_cit, 100)

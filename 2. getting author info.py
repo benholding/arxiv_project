@@ -19,6 +19,10 @@ article_citations_complete = pd.read_pickle(
 
 arxiv_id_df = article_citations_complete.index.to_numpy()
 
+doi_df = article_citations_complete.doi.reset_index().doi.to_csv("arxiv_published_dois_reduced.csv", index=False)
+
+
+
 #%% 
 arxiv_api_data = []
 url = 'http://export.arxiv.org/api/query?id_list=cond-mat/0207270v1'
