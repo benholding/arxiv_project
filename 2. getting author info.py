@@ -67,6 +67,10 @@ author_performance_indices_frac = author_performance_indices_frac\
     .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_frac['p']*author_performance_indices_frac['mcs']))\
     .rename(columns = {'pub_set_no1': 'cluster_id'})
     
+author_performance_indices_full = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_full.csv")
+author_performance_indices_full = author_performance_indices_full\
+    .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_full['p']*author_performance_indices_full['mcs'])) 
+    
 median_full_pseudoh = np.median(author_performance_indices_full['pseudo_h'].dropna())
 median_frac_pseudoh = np.median(author_performance_indices_frac['pseudo_h'].dropna())
 
@@ -76,9 +80,7 @@ plt.title('Histgram of fractionalised pseudo h-index values')
 plt.xlabel('Pseudo Fractionalised h-index (excluding >2 SD)')
 
 
-author_performance_indices_full = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_full.csv")
-author_performance_indices_full = author_performance_indices_full\
-    .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_full['p']*author_performance_indices_full['mcs'])) 
+
     
 plt.hist(author_performance_indices_full.pseudo_h[author_performance_indices_full.pseudo_h <= 2*np.std(author_performance_indices_full.pseudo_h)], bins = 100, edgecolor = 'black')
 plt.axvline(median_full_pseudoh, color = 'yellow')
