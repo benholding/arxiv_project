@@ -74,8 +74,8 @@ merged_two_datasets[['date', 'preprint_date', 'publication_date']] = (merged_two
 
 merged_two_datasets['days_from_publication'] = (merged_two_datasets.date - merged_two_datasets.publication_date).dt.days #i think this is just extracting the days difference between preprint and publication dates
         
-preprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_preprint_posted'] <= 365)] #we are only interested in preprints that were preprints for at least a year (since we want to count citation inthe first year)
-postprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_publication'] >= 0) & (merged_two_datasets['days_from_publication'] <= 365)] #and then similarly we want to know about how many citations the published articles got in the first year
+preprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_preprint_posted'] <= 365)] #now we make two DFs, one with the citation information up to 365 days after publication of the preprint (i.e. preprints). Since all preprints needed to be preprints for at least a year (see above) then this is only preprint data...
+postprint_citations_year1 = merged_two_datasets[(merged_two_datasets['days_from_publication'] >= 0) & (merged_two_datasets['days_from_publication'] <= 365)] #and another for citation information from day 0 to day 365 after publication
 
 preprint_citations_year1_totalcounts = (preprint_citations_year1 #here i'm caluclating the total citation counts (agregating over the daily data) for the preprints 
     .groupby('arxiv_id') #grouping by arxiv_id
@@ -92,28 +92,36 @@ postprint_citations_year1_totalcounts = (postprint_citations_year1 #doing the sa
 cumulative_dataset = (postprint_citations_year1_totalcounts #now merging together preprint and publication citation information
     .merge(preprint_citations_year1_totalcounts, on = ['arxiv_id', 'doi', 'preprint_date', 'publication_date'], how = 'outer' ) # keeping all rows from both DFs
     .reset_index()
-    .fillna(0))
+    .fillna(0)) #in places where there are NAs, these are filled with zero (since all articles are eligible)
 
+#We now have a nice dataset, however we may be missing articles that either a) articles that recieved citations but not within the year we are interested in b) never recieved any citations (either as a preprint or as a published article)
 
-#i need to make two dataframes - a) one with articles with recieved citations, but not in the 1 year window, and b) one of the articles (combined preprint and postprint) that never recieved any citations
-#a)
-arxiv_ids_no_citesfirstyear = pd.DataFrame(citations_by_day_reduced.arxiv_id[~citations_by_day_reduced.arxiv_id.isin(cumulative_dataset.arxiv_id)]).drop_duplicates()
-no_cites_first_year = arxiv_ids_no_citesfirstyear.merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')\
-    .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0)\
-    .filter(items = cumulative_dataset.columns)
-    
+#Therefore, first we find the articles that didn't get any citations in the first year
+#the strategy is to look for arxiv_ids that were in the citations_by_day_reduced DF but not in the cumulative_dataset DF
+arxiv_ids_no_citesfirstyear = pd.DataFrame(citations_by_day_reduced.arxiv_id[~citations_by_day_reduced.arxiv_id.isin(cumulative_dataset.arxiv_id)]).drop_duplicates() #we get a list of missing arxiv_ids
+
+#then we make a mini DF that matches the structure of the cumulative_dataset DF
+no_cites_first_year = (arxiv_ids_no_citesfirstyear
+                       .merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')
+                       .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0) #setting citations to be zero
+                       .filter(items = cumulative_dataset.columns))
+
+#Then we can row bind (Concatenate) the two:    
 cumulative_dataset_with_nocitesfirstyear = pd.concat([cumulative_dataset, no_cites_first_year])
-#b)
-#which of the arxiv_ids were in preprint_info but not in cumulative_dataset_with_nocitesfirstyear
 
-arxiv_ids_no_cites_ever = pd.DataFrame(preprint_info.arxiv_id[~preprint_info.arxiv_id.isin(cumulative_dataset_with_nocitesfirstyear.arxiv_id)])
-no_cites_ever = arxiv_ids_no_cites_ever.merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')\
-    .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0)\
-    .filter(items = cumulative_dataset.columns)
+#b) The next issue was finding articles that were never cited #
+#The strategy is to look for which of the arxiv_ids were in preprint_info but not in cumulative_dataset_with_nocitesfirstyear
+
+arxiv_ids_no_cites_ever = pd.DataFrame(preprint_info.arxiv_id[~preprint_info.arxiv_id.isin(cumulative_dataset_with_nocitesfirstyear.arxiv_id)]) #again we get a list of arxiv_ids
+no_cites_ever = (arxiv_ids_no_cites_ever #again making a DF that matches the structure of the cumulative_dataset DF
+                 .merge(arxiv_doi_df_reduced, on = 'arxiv_id', how = 'left')
+                 .assign(postprint_citations_1styear = 0, preprint_citations_1styear = 0)
+                 .filter(items = cumulative_dataset.columns))
     
-article_citations_complete = pd.concat([cumulative_dataset_with_nocitesfirstyear, no_cites_ever]).sort_values('preprint_citations_1styear', ascending = False)\
-    .set_index('arxiv_id')\
-    .sort_values(['postprint_citations_1styear','preprint_citations_1styear', 'arxiv_id'], ascending = False)
+article_citations_complete = (pd.concat([cumulative_dataset_with_nocitesfirstyear, no_cites_ever]) #again concatenating the two DFs
+                                .sort_values('preprint_citations_1styear', ascending = False)
+                                .set_index('arxiv_id')
+                                .sort_values(['postprint_citations_1styear','preprint_citations_1styear', 'arxiv_id'], ascending = False))
 
 #%% # saving final dataset
-article_citations_complete.to_pickle("data/cumulative_citatations_data.pkl")
+article_citations_complete.to_pickle("data/cumulative_citatations_data.pkl") #saving the data in python format
