@@ -3,21 +3,20 @@
 """
 Created on Wed Aug 31 14:10:08 2022
 
-@author: ben
+Author: Benjamin C. Holding
+Description: In this script, I import author information that we obtained from WoS metadata. I connect this with the DOIs of the published articles
 """
-#for data manipulation
+#Importing packages for data manipulation
 import pandas as pd #importing the pandas library
-import numpy as np #
+import numpy as np #importing numpy library
 pd.set_option('display.max_columns', 40) #setting an option for how many columns are shown in the console when loading dataframes
-pd.set_option('display.width', 180) #this value can be changed to 
+pd.set_option('display.width', 180) #sets the width of the console before information is given on a new line.
 
-#for data visualisation
+#Importing packages for data visualisation
 import matplotlib.pyplot as plt #importing the pyplot function from matplotlib and referring to it via plt
 from matplotlib import rcParams #importing the rcParams function from matplotlib, because i wanted to have control over default plotting settings
-
 plt.style.use("ggplot") #setting the plot style so that they look like ggplot...
 rcParams['figure.figsize'] = (12,  6) #setting plot size in inches (width, height)
-
 
 #%% #import citation information dataframe
 
@@ -31,57 +30,58 @@ article_citations_complete = pd.read_pickle(
 
 published_article_metadata = pd.read_csv("./data/wos_data/arxiv_pubs.csv") #importing the csv containing 
 variables_to_keep = ["doi_code", "author_seq", "cluster_id", "full_name", "gender", "orcid", "affiliation_seq", "affiliation_organization_enhanced_seq", "organization_enhanced_id", "organization_enhanced", "country", "is_industry", "collaboration_type_no"]
-author_information = published_article_metadata[variables_to_keep]
+author_information = published_article_metadata[variables_to_keep] #keeping only certain key variables
 
 #exploritory analysis of author information
-author_information.info()
-author_information.duplicated().sum() #we have 1071 rows that are duplicates - why?
-author_information[author_information.duplicated(keep = False)] #using keep = False here to ensure it shows all instances of the duplicate
-# uncertain why these duplicate authors exist, but we can remove them
-author_information_2 = author_information[~author_information.duplicated(keep = 'first')] #~ inverts a logical variable
-author_information_2.gender.value_counts()
-author_information_2.organization_enhanced.value_counts()
-author_information_2.country.value_counts()
-author_information_2.is_industry.value_counts()
-author_information_2.collaboration_type_no.value_counts()
-author_information_2.gender.value_counts().plot(kind="bar")
+author_information.info() #gives a list of the columns and the datatype of the columns. 
+author_information.duplicated().sum() #we have 1071 rows that are exact duplicates - uncertain why these duplicates exist, but we remove them below
+author_information[author_information.duplicated(keep = False)] #just to visually check the duplicates - using keep = False here to ensure it shows all instances of the duplicate
+author_information_2 = author_information[~author_information.duplicated(keep = 'first')] #~ inverts a logical variable. Keep = True: Mark duplicates as ``True`` except for the first occurrence.Therefore, by inverting we are indexing the first instances of the duplicate
+author_information_2.gender.value_counts() #how many rows are men vs women (this isn't correct because there are multiple affilations in there still I think)
+author_information_2.organization_enhanced.value_counts() #how many people are there from different organisations (remember multiple affilations are present)
+author_information_2.country.value_counts() #how many people from different countries (remember multiple affilations are present)
+author_information_2.is_industry.value_counts() #how many authors are industry authors (remember multiple affilations are present)
+author_information_2.collaboration_type_no.value_counts() #can't remember what these different values represent (remember multiple affilations are present)
+author_information_2.gender.value_counts().plot(kind="bar") #histogram of gender split (remember multiple affilations are present)
 #author_information_2.organization_enhanced.value_counts().plot(kind="bar")
-author_information_2.country.value_counts().plot(kind="bar")
+author_information_2.country.value_counts().plot(kind="bar") #histogram of country split (remember multiple affilations are present)
 
 #creating dataset of first and last authors only
-first_authors_info = author_information_2.loc[author_information_2['author_seq'] == 1].reset_index(drop = True)
+first_authors_info = author_information_2.loc[author_information_2['author_seq'] == 1].reset_index(drop = True) #taking rows where author sequence is 1 to identify first authors (remember multiple affilations are present). The reset_index(drop = True) mean that the index is reset and the original index is NOT inserted as a new column variable
 
-#next i need to work out how to group by doi, so i can identify the max of the seq, and then use that to identify who the last authors were
-last_author_seq_per_article = author_information_2.groupby('doi_code')['author_seq'].max().dropna().reset_index().rename(columns = {'author_seq': 'last_author_seq_in_article'})
+#To get last authors we need to group by doi, so we can identify the max of the seq, and then use that to identify who the last authors were
+last_author_seq_per_article = author_information_2.groupby('doi_code')['author_seq'].max().dropna().reset_index().rename(columns = {'author_seq': 'last_author_seq_in_article'}) #group by doi, subset affilation_seq column, identify the max per doi, remove nas, reset the row index, rename the resulting column output to something more meaningful
 
-author_information_2 = author_information_2.merge(last_author_seq_per_article, on = 'doi_code', how = 'left')
-last_author_info = author_information_2[author_information_2['author_seq'] == author_information_2['last_author_seq_in_article']].reset_index(drop = True)
+author_information_2 = author_information_2.merge(last_author_seq_per_article, on = 'doi_code', how = 'left') #merging our new column of last_author_seq per doi, and the original DF
+last_author_info = author_information_2.loc[author_information_2['author_seq'] == author_information_2['last_author_seq_in_article']].reset_index(drop = True) #to get a DF of just last authors, we only keep rows where author_seq is the same as  the value in the 'last_author_seq_in_article'
 
 #sanity check that these are unique last authors
 last_author_info[last_author_info.duplicated('doi_code', keep = False)] #duplicates due to multiple affilations - totally fine!
 
 
-#%% import complete publication list
-author_performance_indices_frac = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_frac.csv")
-author_performance_indices_frac = author_performance_indices_frac\
-    .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_frac['p']*author_performance_indices_frac['mcs']))\
-    .rename(columns = {'pub_set_no1': 'cluster_id'})
+#%% NEXT: We import per-author performance metrics. 
+#According to Jesper, JIFS were calculated by fixing "points say 2010, 2015 and 2020 or whatever and then simply calculate a JIF where we pool 5 publications years and calculate impact with 3-year citation windows"
+author_performance_indices_frac = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_frac.csv") #importing fractionalised performance over researcher career
+author_performance_indices_frac = (author_performance_indices_frac
+    .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_frac['p']*author_performance_indices_frac['mcs']))
+    .rename(columns = {'pub_set_no1': 'cluster_id'})) #creating the fractionalised h-index
     
-author_performance_indices_full = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_full.csv")
-author_performance_indices_full = author_performance_indices_full\
+author_performance_indices_full = pd.read_csv("./data/wos_data/arxiv_clusterID_impact_full.csv") #importing full count performance
+author_performance_indices_full = (author_performance_indices_full
     .assign(pseudo_h = 0.54*np.sqrt(author_performance_indices_full['p']*author_performance_indices_full['mcs'])) 
+    .rename(columns = {'pub_set_no1': 'cluster_id'})) #creating the full_count h-index
     
-median_full_pseudoh = np.median(author_performance_indices_full['pseudo_h'].dropna())
-median_frac_pseudoh = np.median(author_performance_indices_frac['pseudo_h'].dropna())
+#plotting the h-indices
+median_full_pseudoh = np.median(author_performance_indices_full['pseudo_h'].dropna()) #obtaining the median for full count hindex
+median_frac_pseudoh = np.median(author_performance_indices_frac['pseudo_h'].dropna())#obtaining the median for fractionalised count hindex
 
+#plot of fractionalised count h-index distribution
 plt.hist(author_performance_indices_frac.pseudo_h[author_performance_indices_frac.pseudo_h <= 2*np.std(author_performance_indices_frac.pseudo_h)], bins = 100, edgecolor = 'black')
 plt.axvline(median_frac_pseudoh, color = 'yellow')
 plt.title('Histgram of fractionalised pseudo h-index values')
 plt.xlabel('Pseudo Fractionalised h-index (excluding >2 SD)')
 
-
-
-    
+#plot of full count h-index distribution    
 plt.hist(author_performance_indices_full.pseudo_h[author_performance_indices_full.pseudo_h <= 2*np.std(author_performance_indices_full.pseudo_h)], bins = 100, edgecolor = 'black')
 plt.axvline(median_full_pseudoh, color = 'yellow')
 plt.title('Histgram of full pseudo h-index values')
@@ -90,9 +90,6 @@ plt.ylabel('Number of authors')
 
 #%%
 # To do: Connect arkiv data to published articles metadata + first_author information and last_author information
-article_citations_complete
-
-author_performance_indices_full
 
 test = first_authors_info[first_authors_info['affiliation_seq'] == 1.0][['doi_code', 'cluster_id', 'gender','organization_enhanced', 'country', 'affiliation_seq', 'affiliation_organization_enhanced_seq','organization_enhanced_id']]\
     .rename(columns = {'doi_code': 'doi', 'organization_enhanced': 'institution'})\
